@@ -1,6 +1,6 @@
 ---
 name: nixiang_nano
-description: Generates text and images through Gemini Web with strong support for reference-image generation, downloaded outputs, and reusable chat sessions. Use when you want Nano Banana style image creation from prompts or references in your own signed-in browser session.
+description: Generates text and images through Gemini Web with strong support for reference-image generation, reusable chat sessions, and optional Gemini watermark removal on saved outputs. Use when you want Nano Banana style image creation from prompts or references in your own signed-in browser session.
 version: 0.1.0
 metadata:
   openclaw:
@@ -13,7 +13,7 @@ metadata:
 
 # Nixiang Nano
 
-Standalone Gemini Web skill for prompt-based and reference-image image generation.
+Standalone Gemini Web skill for prompt-based and reference-image image generation, with optional local Gemini watermark removal for saved images.
 
 ## Script Directory
 
@@ -30,6 +30,7 @@ All scripts live in the `scripts/` subdirectory.
 |--------|---------|
 | `scripts/main.ts` | CLI entry point for text generation, image generation, vision input, and session management |
 | `scripts/gemini-webapi/*` | Gemini Web client, parser, authentication helpers, and image download logic |
+| `scripts/vendor/gemini-watermark-remover/*` | Vendored watermark-removal engine adapted from GargantuaX's MIT-licensed project |
 
 ## Consent Check
 
@@ -71,6 +72,7 @@ ${BUN_X} {baseDir}/scripts/main.ts --prompt "Your prompt" --model gemini-3-flash
 
 # Image generation
 ${BUN_X} {baseDir}/scripts/main.ts --prompt "A glossy product poster" --image out.png
+${BUN_X} {baseDir}/scripts/main.ts --prompt "A glossy product poster" --image out.png --remove-watermark
 ${BUN_X} {baseDir}/scripts/main.ts --promptfiles system.md content.md --image out.png
 
 # Reference-image generation
@@ -93,6 +95,7 @@ ${BUN_X} {baseDir}/scripts/main.ts "Hello" --json
 | `--promptfiles` | Read prompt from one or more files |
 | `--model`, `-m` | Model id |
 | `--image [path]` | Generate and save an image |
+| `--remove-watermark` | Remove Gemini watermark from the saved image after download |
 | `--reference`, `--ref` | Reference image files |
 | `--sessionId` | Reuse a saved multi-turn session |
 | `--list-sessions` | List saved sessions |

@@ -5,6 +5,7 @@ import { mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises';
 
 import { GeminiClient, GeneratedImage, Model, type ModelOutput } from './gemini-webapi/index.js';
 import { resolveGeminiWebChromeProfileDir, resolveGeminiWebCookiePath, resolveGeminiWebSessionPath, resolveGeminiWebSessionsDir } from './gemini-webapi/utils/index.js';
+import { removeGeminiWatermarkFromFile } from './watermark-remover.ts';
 
 type CliArgs = {
   prompt: string | null;
@@ -12,6 +13,7 @@ type CliArgs = {
   modelId: string;
   json: boolean;
   imagePath: string | null;
+  removeWatermark: boolean;
   referenceImages: string[];
   sessionId: string | null;
   listSessions: boolean;
@@ -79,6 +81,7 @@ function printUsage(cookiePath: string, profileDir: string): void {
   ${cmd} --prompt "Hello"
   ${cmd} "Hello"
   ${cmd} --prompt "A cute cat" --image generated.png
+  ${cmd} --prompt "A cute cat" --image generated.png --remove-watermark
   ${cmd} --promptfiles system.md content.md --image out.png
 
 Multi-turn conversation (agent generates unique sessionId):
@@ -91,6 +94,7 @@ Options:
   -m, --model <id>          gemini-3-pro | gemini-3-flash | gemini-3-flash-thinking | gemini-3.1-pro-preview (default: gemini-3-pro)
   --json                    Output JSON
   --image [path]            Generate an image and save it (default: ./generated.png)
+  --remove-watermark        Remove Gemini watermark from the saved image after download
   --reference <files...>    Reference images for vision input
   --ref <files...>          Alias for --reference
   --sessionId <id>          Session ID for multi-turn conversation (agent should generate unique ID)
@@ -116,6 +120,7 @@ function parseArgs(argv: string[]): CliArgs {
     modelId: 'gemini-3-pro',
     json: false,
     imagePath: null,
+    removeWatermark: false,
     referenceImages: [],
     sessionId: null,
     listSessions: false,
@@ -149,6 +154,11 @@ function parseArgs(argv: string[]): CliArgs {
 
     if (a === '--json') {
       out.json = true;
+      continue;
+    }
+
+    if (a === '--remove-watermark') {
+      out.removeWatermark = true;
       continue;
     }
 
@@ -465,6 +475,7 @@ async function main(): Promise<void> {
     else out = await c.generate_content(prompt, files, model);
 
     let savedImage: string | null = null;
+    let watermarkRemoval: { applied: boolean; outputPath: string; meta: unknown } | null = null;
     if (args.imagePath) {
       const p = normalizeOutputImagePath(args.imagePath);
       const dir = path.dirname(p);
@@ -483,6 +494,15 @@ async function main(): Promise<void> {
       } else {
         savedImage = await img.save(dp, fn, c.cookies, false, false);
       }
+
+      if (savedImage && args.removeWatermark) {
+        const removed = await removeGeminiWatermarkFromFile(savedImage);
+        watermarkRemoval = {
+          applied: removed.applied,
+          outputPath: removed.outputPath,
+          meta: removed.meta,
+        };
+      }
     }
 
     if (sess && args.sessionId) {
@@ -495,7 +515,7 @@ async function main(): Promise<void> {
     }
 
     if (args.json) {
-      console.log(formatJson(out, { savedImage, sessionId: args.sessionId, model: model.model_name }));
+      console.log(formatJson(out, { savedImage, watermarkRemoval, sessionId: args.sessionId, model: model.model_name }));
     } else if (args.imagePath) {
       console.log(savedImage ?? '');
     } else {
